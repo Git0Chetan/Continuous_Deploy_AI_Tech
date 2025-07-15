@@ -1,0 +1,39 @@
+name: Deploy to GCP Cloud Run
+
+on:
+  push:
+    branches:
+      - main  # or your default branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: your-project-id
+        service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+    - name: Configure Docker for GCloud authentications
+      run: gcloud auth configure-docker
+
+    - name: Build Docker image
+      run: |
+        docker build -t gcr.io/sublime-lodge-466005-i7/flaskwebhook .
+
+    - name: Push Docker image
+      run: |
+        docker push gcr.io/sublime-lodge-466005-i7/flaskwebhook
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy flask-webhook \
+          --image gcr.io/sublime-lodge-466005-i7/flaskwebhook \
+          --region us-central1 \
+          --platform managed \
+          --allow-unauthenticated
