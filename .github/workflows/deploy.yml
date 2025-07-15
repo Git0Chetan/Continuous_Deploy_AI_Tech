@@ -13,17 +13,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Authenticate to Google Cloud
+    - name: Authenticate to GCP
       uses: google-github-actions/auth@v1
       with:
         credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-    - name: Set up gcloud SDK
+    - name: Set up gcloud CLI
       uses: google-github-actions/setup-gcloud@v1
       with:
         project_id: your-project-id
-        service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-
+        install_components: 'gcloud'
+        # no 'service_account_key' here
+        
     - name: Configure Docker for GCR
       run: gcloud auth configure-docker
 
