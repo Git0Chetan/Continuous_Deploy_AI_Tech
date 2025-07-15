@@ -16,7 +16,7 @@ jobs:
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
       with:
-        project_id: your-project-id
+        project_id: sublime-lodge-466005-i7
         service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
     - name: Configure Docker for GCloud authentications
@@ -24,16 +24,16 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t gcr.io/sublime-lodge-466005-i7/flaskwebhook .
+        docker build -t gcr.io/your-project-id/flaskwebhook .
 
     - name: Push Docker image
       run: |
-        docker push gcr.io/sublime-lodge-466005-i7/flaskwebhook
+        docker push gcr.io/your-project-id/flaskwebhook
 
     - name: Deploy to Cloud Run
       run: |
         gcloud run deploy flask-webhook \
-          --image gcr.io/sublime-lodge-466005-i7/flaskwebhook \
+          --image gcr.io/your-project-id/flaskwebhook \
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated
