@@ -2,6 +2,11 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
+@app.get("/")
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
+
+
 @app.route('/webhook', methods=['POST'])
 def github_webhook():
     payload = request.json

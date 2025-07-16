@@ -10,5 +10,4 @@ COPY . .
 # Install dependencies
 RUN pip install -r requirements.txt
 
-# Run the Flask app using gunicorn
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "main:app"]
+CMD ["python3", "app.py"]
