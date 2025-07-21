@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import requests
 
-app = Flask(__name__)git
+app = Flask(__name__)
 
 @app.get("/")
 def health_check():
