@@ -4,22 +4,30 @@ import requests
 
 app = Flask(__name__)
 
+log_output = ""
+
+def log(message):
+    global log_output
+    log_output += message + "\n"
+
 @app.get("/")
 def health_check():
-    print("ur system is working in a good condition- chetan")
+    log("ur system is working in a good condition- chetan")
     return jsonify({'status': 'healthy'}), 200
 
 @app.route('/webhook', methods=['POST'])
 def github_webhook():
+    global log_output
+    log_output = ""
     payload = request.json
     # Log payload for debugging
-    print("Received event:", request.headers.get('X-GitHub-Event'))
-    print("Payload:", payload)
+    log("Received event: " + request.headers.get('X-GitHub-Event', 'No Event Header'))
+    log("Payload: " + str(payload))
 
     # Trigger your decision module here
     handle_event(payload)
 
-    return jsonify({'status': 'ok'}), 200
+    return log_output, 200
 
 def is_tag_event(payload):
     ref = payload.get('ref', '')
@@ -47,7 +55,7 @@ def get_changed_files(payload):
             files = commit_info.get('files', [])
             return [file['filename'] for file in files]
         else:
-            print(f"Failed to fetch commit details: {r.status_code}")
+            log(f"Failed to fetch commit details: {r.status_code}")
             return []
     # Extend for PR events if necessary
     return []
@@ -66,19 +74,19 @@ def handle_event(payload):
     if event_type == 'push':
         if is_tag_event(payload):
             tag_name = get_tag_name(payload)
-            print(f"Tag detected: {tag_name}")
+            log(f"Tag detected: {tag_name}")
             if tag_name == 'yes_test':
-                print("Test cases are required due to 'yes_test' tag.")
+                log("Test cases are required due to 'yes_test' tag.")
                 # Trigger test case generation here
                 return
         # If not a relevant tag, check changed files
         changed_files = get_changed_files(payload)
         if requires_test_update(changed_files):
-            print("Changes detected requiring new tests.")
+            log("Changes detected requiring new tests.")
         else:
-            print("No testing updates required.")
+            log("No testing updates required.")
     elif event_type == 'pull_request':
-        print("Pull request event detected.")
+        log("Pull request event detected.")
         # Handle PR events if needed
 
 if __name__ == '__main__':
