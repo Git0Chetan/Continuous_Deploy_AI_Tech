@@ -22,7 +22,7 @@ def github_webhook():
     payload = request.json
     # Log payload for debugging
     log("Received event: " + request.headers.get('X-GitHub-Event', 'No Event Header'))
-    log("Payload: " + str(payload))
+    # log("Payload: " + str(payload))
 
     # Trigger your decision module here
     handle_event(payload)
