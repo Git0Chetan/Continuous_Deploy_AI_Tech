@@ -6,6 +6,7 @@ app = Flask(__name__)
 
 @app.get("/")
 def health_check():
+    print("ur system is working in a good condition- chetan")
     return jsonify({'status': 'healthy'}), 200
 
 @app.route('/webhook', methods=['POST'])
