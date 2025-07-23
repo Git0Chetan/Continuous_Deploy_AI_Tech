@@ -95,7 +95,7 @@ def create_or_update_github_file(owner_repo, filepath, content, branch='main'):
 def generate_tests_for_code(source_code_str):
     import google.generativeai as genai
     import os
-    api_key = os.environ.get('GOOGLE_API_KEY')
+    api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
         log("Error: GOOGLE_API_KEY environment variable not set")
         return ""
