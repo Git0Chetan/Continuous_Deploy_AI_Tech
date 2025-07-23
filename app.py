@@ -137,7 +137,7 @@ def handle_event(payload, event_type):
         if changed_files:
             # For each modified Python file, generate tests and push
             for f in changed_files:
-                if f.endswith('.py'):
+                if f.endswith('.py') and not f.endswith('_test.py'):
                     log(f"Processing file: {f}")
                     source_content = fetch_file_content_in_repo(owner_repo, f, branch)
                     if source_content is None:
