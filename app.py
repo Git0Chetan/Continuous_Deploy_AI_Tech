@@ -10,11 +10,10 @@ from google.cloud import storage
 app = Flask(__name__)
 
 storage_client = storage.Client()
-bucket-name= os.environ.get('bucket-name')
-    if not bucket-name:
+BUCKET_NAME= os.environ.get('BUCKET_NAME')
+    if not BUCKET_NAME:
         log("Error: bucket-name environment variable not set")
-        return ""
-BUCKET_NAME = bucket-name  
+
 bucket = storage_client.bucket(BUCKET_NAME)
 
 # Set up logs directory and log file
