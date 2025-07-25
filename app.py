@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 storage_client = storage.Client()
 BUCKET_NAME= os.environ.get('BUCKET_NAME')
-    if not BUCKET_NAME:
+if not BUCKET_NAME:
         raise RuntimeError("Error: bucket-name environment variable not set")
 
 bucket = storage_client.bucket(BUCKET_NAME)
