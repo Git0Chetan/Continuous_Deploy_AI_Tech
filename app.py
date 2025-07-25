@@ -3,30 +3,47 @@ import os
 import requests
 import tempfile
 import base64
+import logging
 
 app = Flask(__name__)
 
-log_output = ""
+# Set up logs directory and log file
+LOG_DIR = "/app/logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "app.log")
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()  # ensures logs show up in Cloud Run logs
+    ]
+)
 
 def log(message):
-    global log_output
-    log_output += message + "\n"
+    # Use logging.info for info messages
+    logging.info(message)
 
 @app.get("/")
 def health_check():
-    log("ur system is working in a good condition- chetan")
+    log("System is working in good condition - chetan")
     return jsonify({'status': 'healthy'}), 200
 
 @app.route('/webhook', methods=['POST'])
 def github_webhook():
-    global log_output
-    log_output = ""
     payload = request.json
     event_type = request.headers.get('X-GitHub-Event', 'No Event Header')
-    log("Received event: " + event_type)
-    # log("Payload: " + str(payload))
-    handle_event(payload, event_type)
-    return log_output, 200
+    log(f"Received event: {event_type}")
+    try:
+        handle_event(payload, event_type)
+    except Exception:
+        # Log any unexpected errors
+        logging.exception("Error handling webhook")
+        return jsonify({'error': 'Internal server error'}), 500
+    return "Event processed", 200
+
 
 
 def is_tag_event(payload):
