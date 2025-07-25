@@ -4,27 +4,57 @@ import requests
 import tempfile
 import base64
 import logging
+from datetime import datetime
+from google.cloud import storage
 
 app = Flask(__name__)
 
+storage_client = storage.Client()
+bucket-name= os.environ.get('bucket-name')
+    if not bucket-name:
+        log("Error: bucket-name environment variable not set")
+        return ""
+BUCKET_NAME = bucket-name  
+bucket = storage_client.bucket(BUCKET_NAME)
+
 # Set up logs directory and log file
-LOG_DIR = "/app/logs"
-os.makedirs(LOG_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOG_DIR, "app.log")
+# LOG_DIR = "/app/logs"
+# os.makedirs(LOG_DIR, exist_ok=True)
+# LOG_FILE = os.path.join(LOG_DIR, "app.log")
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s: %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler()  # ensures logs show up in Cloud Run logs
-    ]
-)
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s %(levelname)s: %(message)s',
+#     handlers=[
+#         logging.FileHandler(LOG_FILE),
+#         logging.StreamHandler()  # ensures logs show up in Cloud Run logs
+#     ]
+# )
+
+def get_log_filename():
+    # Create filename like logs_YYYYMMDD-HHMMSS.txt
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    return f"logs_{timestamp}.txt"
+
+def log_to_gcs(message):
+    filename = get_log_filename()
+    blob = bucket.blob(filename)
+    try:
+        # Download existing contents if exists
+        if blob.exists():
+            existing_content = blob.download_as_text()
+        else:
+            existing_content = ""
+    except Exception:
+        existing_content = ""
+    # Append new message
+    new_content = existing_content + message + "\n"
+    blob.upload_from_string(new_content)
 
 def log(message):
-    # Use logging.info for info messages
-    logging.info(message)
+    print(message)  # still print locally and in cloud logs
+    log_to_gcs(message)
 
 @app.get("/")
 def health_check():
