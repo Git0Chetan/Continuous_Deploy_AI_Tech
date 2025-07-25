@@ -12,24 +12,9 @@ app = Flask(__name__)
 storage_client = storage.Client()
 BUCKET_NAME= os.environ.get('BUCKET_NAME')
     if not BUCKET_NAME:
-        log("Error: bucket-name environment variable not set")
+        raise RuntimeError("Error: bucket-name environment variable not set")
 
 bucket = storage_client.bucket(BUCKET_NAME)
-
-# Set up logs directory and log file
-# LOG_DIR = "/app/logs"
-# os.makedirs(LOG_DIR, exist_ok=True)
-# LOG_FILE = os.path.join(LOG_DIR, "app.log")
-
-# Configure logging
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format='%(asctime)s %(levelname)s: %(message)s',
-#     handlers=[
-#         logging.FileHandler(LOG_FILE),
-#         logging.StreamHandler()  # ensures logs show up in Cloud Run logs
-#     ]
-# )
 
 def get_log_filename():
     # Create filename like logs_YYYYMMDD-HHMMSS.txt
