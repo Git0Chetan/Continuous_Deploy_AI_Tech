@@ -10,6 +10,10 @@ from google.cloud import storage
 
 app = Flask(__name__)
 
+LOG_DIR = "/app/logs"
+LOG_FILE_PATH = os.path.join(LOG_DIR, "app.log")
+os.makedirs(LOG_DIR, exist_ok=True)
+
 storage_client = storage.Client()
 BUCKET_NAME= os.environ.get('BUCKET_NAME')
 if not BUCKET_NAME:
@@ -17,71 +21,65 @@ if not BUCKET_NAME:
 
 bucket = storage_client.bucket(BUCKET_NAME)
 
-def get_log_filename():
-    # Create filename like logs_YYYYMMDD-HHMMSS.txt
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    return f"logs_{timestamp}.txt"
 
-def log_to_gcs(message):
-    filename = get_log_filename()
-    blob = bucket.blob(filename)
+def log_to_file(message):
+    """Append message to the fixed log file."""
     try:
-        # Download existing contents if exists
-        if blob.exists():
-            existing_content = blob.download_as_text()
-        else:
-            existing_content = ""
-    except Exception:
-        existing_content = ""
-    # Append new message
-    new_content = existing_content + message + "\n"
-    blob.upload_from_string(new_content)
+        with open(LOG_FILE_PATH, 'a') as f:
+            f.write(message + "\n")
+    except Exception as e:
+        # Optional: handle logging error
+        print("Logging to file failed:", e)
+
 
 def log(message):
-    print(message)  # still print locally and in cloud logs
-    log_to_gcs(message)
+    """Print and save logs."""
+    print(message)
+    log_to_file(message)
 
 @app.get("/")
 def health_check():
-    log("System is working in good condition - chetan")
+    message = "Health check triggered."
+    log(message)
     return jsonify({'status': 'healthy'}), 200
 
 
 
 def handle_event_async(payload, event_type):
+    """Process webhook event asynchronously."""
     try:
         handle_event(payload, event_type)
-    except Exception:
-        log("Error in background task")
+        log("Background processing completed successfully.")
+    except Exception as e:
+        log(f"Error in background processing: {e}")
 
 
 @app.route('/webhook', methods=['POST'])
 def github_webhook():
     payload = request.json
     event_type = request.headers.get('X-GitHub-Event', 'No Event Header')
-    log(f"Received event: {event_type}")
-    thread = threading.Thread(target=handle_event_async, args=(payload, event_type))
+    log(f"Webhook triggered for event: {event_type}")
+
+    # Start async processing to avoid timeout
+    thread = Thread(target=handle_event_async, args=(payload, event_type))
     thread.start()
+
+    log("Started background processing for event.")
     return jsonify({'status': 'processing'}), 200
-
-    # try:
-    #     handle_event(payload, event_type)
-    # except Exception:
-    #     # Log any unexpected errors
-    #     logging.exception("Error handling webhook")
-    #     return jsonify({'error': 'Internal server error'}), 500
-    # return "Event processed", 200
-
 
 
 def is_tag_event(payload):
     ref = payload.get('ref', '')
-    return ref.startswith('refs/tags/')
+    result = ref.startswith('refs/tags/')
+    log(f"is_tag_event: ref={ref} result={result}")
+    return result
 
 def get_tag_name(payload):
     ref = payload.get('ref', '')
     if ref.startswith('refs/tags/'):
-        return ref.replace('refs/tags/', '')
+        tag_name = ref.replace('refs/tags/', '')
+        log(f"Extracted tag: {tag_name}")
+        return tag_name
     return None
 
 def get_changed_files(payload):
@@ -90,63 +88,71 @@ def get_changed_files(payload):
         owner_repo = payload['repository']['full_name']
         GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
         if not GITHUB_TOKEN:
-            raise RuntimeError("GITHUB_TOKEN environment variable not set")
+            log("GITHUB_TOKEN environment variable not set")
+            return []
         url = f"https://api.github.com/repos/{owner_repo}/commits/{ref}"
         headers = {'Authorization': f'token {GITHUB_TOKEN}'}
-        r = requests.get(url, headers=headers)
-        if r.status_code == 200:
-            commit_info = r.json()
+        response = requests.get(url, headers=headers)
+        log(f"Fetching commit details: {url} Status: {response.status_code}")
+        if response.status_code == 200:
+            commit_info = response.json()
             files = commit_info.get('files', [])
-            return [file['filename'] for file in files]
+            filenames = [file['filename'] for file in files]
+            log(f"Changed files: {filenames}")
+            return filenames
         else:
-            log(f"Failed to fetch commit details: {r.status_code}")
+            log(f"Failed to fetch commit details: {response.status_code}")
             return []
-    return []
-
+    else:
+        log("Payload missing 'before' or 'after'")
+        return []
 
 def fetch_file_content_in_repo(owner_repo, filepath, branch='main'):
     GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
     url = f"https://api.github.com/repos/{owner_repo}/contents/{filepath}?ref={branch}"
     headers = {'Authorization': f'token {GITHUB_TOKEN}'}
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        json_data = r.json()
+    response = requests.get(url, headers=headers)
+    log(f"Fetching file content: {url} Status: {response.status_code}")
+    if response.status_code == 200:
+        json_data = response.json()
         content_b64 = json_data['content']
-        return base64.b64decode(content_b64).decode('utf-8')
-    return None
-
+        content = base64.b64decode(content_b64).decode('utf-8')
+        log(f"Fetched content for {filepath}")
+        return content
+    else:
+        log(f"Failed to fetch file: {filepath}")
+        return None
 
 def create_or_update_github_file(owner_repo, filepath, content, branch='main'):
     GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
     url = f"https://api.github.com/repos/{owner_repo}/contents/{filepath}"
     headers = {'Authorization': f'token {GITHUB_TOKEN}'}
-    # Check if file exists to get its sha
-    r = requests.get(url, headers=headers)
+
+    # Check if file exists to get sha
+    response = requests.get(url, headers=headers)
     data = {
         "message": f"Add or update {filepath}",
         "content": base64.b64encode(content.encode()).decode(),
         "branch": branch
     }
-    if r.status_code == 200:
-        sha = r.json().get('sha')
+    if response.status_code == 200:
+        sha = response.json().get('sha')
         data['sha'] = sha
-    r2 = requests.put(url, headers=headers, json=data)
-    if r2.status_code in (200, 201):
-        log(f"Successfully uploaded: {filepath}")
+        log(f"Existing file sha found: {sha}")
+    response_put = requests.put(url, headers=headers, json=data)
+    if response_put.status_code in (200, 201):
+        log(f"Successfully uploaded {filepath}")
     else:
-        log(f"Failed to upload {filepath}: {r2.status_code}, {r2.text}")
-
+        log(f"Failed to upload {filepath}: {response_put.status_code} {response_put.text}")
 
 def generate_tests_for_code(source_code_str):
     import google.generativeai as genai
-    import os
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
-        log("Error: GOOGLE_API_KEY environment variable not set")
+        log("Error: OPENAI_API_KEY environment variable not set")
         return ""
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
-
     prompt = (
         "You are a Python test automation engineer. "
         "Analyze the following Python code and generate comprehensive pytest test functions for it. "
@@ -162,8 +168,8 @@ def generate_tests_for_code(source_code_str):
         test_code = test_code[9:]
     if test_code.endswith("```"):
         test_code = test_code[:-3]
+    log("Generated test code for source.")
     return test_code
-
 
 def handle_event(payload, event_type):
     if event_type == 'push':
@@ -173,14 +179,15 @@ def handle_event(payload, event_type):
             log(f"Tag detected: {tag_name}")
             if tag_name == 'yes_test':
                 log("Test cases are required due to 'yes_test' tag.")
-                # Fall through to generate tests for modified files
+        else:
+            log("No tag detected.")
 
         changed_files = get_changed_files(payload)
         owner_repo = payload['repository']['full_name']
         branch = payload['ref'].split("/")[-1]  # e.g., refs/heads/main -> main
+        log(f"Processing branch: {branch}")
 
         if changed_files:
-            # For each modified Python file, generate tests and push
             for f in changed_files:
                 if f.endswith('.py') and not f.endswith('_test.py'):
                     log(f"Processing file: {f}")
@@ -195,30 +202,27 @@ def handle_event(payload, event_type):
                         log(f"No test code generated for {f}")
                         continue
 
-                    # Determine test filename
+                    # Save test code to local file temporarily
                     test_filename = f"{os.path.splitext(os.path.basename(f))[0]}_test.py"
                     test_dir = "tests"
                     os.makedirs(test_dir, exist_ok=True)
                     test_filepath = os.path.join(test_dir, test_filename)
-
-                    # Write test code to file
                     with open(test_filepath, 'w', encoding='utf-8') as tf:
                         tf.write("import pytest\n")
                         tf.write(f"import sys\nimport os\n")
                         tf.write(f"sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\n")
                         tf.write(f"from {os.path.splitext(os.path.basename(f))[0]} import *\n\n")
                         tf.write(test_code)
-
-                    # Push test file to GitHub repository
-                    owner_repo_name = owner_repo  # e.g., username/repo
-                    create_or_update_github_file(owner_repo_name, test_filepath, open(test_filepath, 'r').read())
+                    # Upload test file to GitHub repo
+                    create_or_update_github_file(owner_repo, test_filepath, open(test_filepath, 'r').read())
         else:
             log("No changed Python files detected.")
     elif event_type == 'pull_request':
         log("Pull request event detected.")
     else:
-        log(f"Unhandled event type: {event_type}")
+        log(f"Unhandled event: {event_type}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8080'))
+    log("Starting Flask app.")
     app.run(host='0.0.0.0', port=port)
