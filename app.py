@@ -4,6 +4,7 @@ import requests
 import tempfile
 import base64
 import logging
+import threading
 from datetime import datetime
 from google.cloud import storage
 
@@ -45,18 +46,31 @@ def health_check():
     log("System is working in good condition - chetan")
     return jsonify({'status': 'healthy'}), 200
 
+
+
+def handle_event_async(payload, event_type):
+    try:
+        handle_event(payload, event_type)
+    except Exception:
+        log("Error in background task")
+
+
 @app.route('/webhook', methods=['POST'])
 def github_webhook():
     payload = request.json
     event_type = request.headers.get('X-GitHub-Event', 'No Event Header')
     log(f"Received event: {event_type}")
-    try:
-        handle_event(payload, event_type)
-    except Exception:
-        # Log any unexpected errors
-        logging.exception("Error handling webhook")
-        return jsonify({'error': 'Internal server error'}), 500
-    return "Event processed", 200
+    thread = threading.Thread(target=handle_event_async, args=(payload, event_type))
+    thread.start()
+    return jsonify({'status': 'processing'}), 200
+
+    # try:
+    #     handle_event(payload, event_type)
+    # except Exception:
+    #     # Log any unexpected errors
+    #     logging.exception("Error handling webhook")
+    #     return jsonify({'error': 'Internal server error'}), 500
+    # return "Event processed", 200
 
 
 
