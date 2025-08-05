@@ -22,20 +22,32 @@ if not BUCKET_NAME:
 bucket = storage_client.bucket(BUCKET_NAME)
 
 
-def log_to_file(message):
-    """Append message to the fixed log file."""
+def log_to_gcs(message):
+    # Append to local log file
     try:
         with open(LOG_FILE_PATH, 'a') as f:
             f.write(message + "\n")
     except Exception as e:
-        # Optional: handle logging error
-        print("Logging to file failed:", e)
+        print("Error writing to local log file:", e)
+
+    # Upload entire log to GCS
+    try:
+        if os.path.exists(LOG_FILE_PATH):
+            with open(LOG_FILE_PATH, 'r') as f:
+                content = f.read()
+            blob = bucket.blob('app.log')  # static filename
+            blob.upload_from_string(content)
+            print("Logs uploaded to GCS")
+        else:
+            print("Log file not found for upload.")
+    except Exception as e:
+        print("Error uploading logs to GCS:", e)
 
 
 def log(message):
     """Print and save logs."""
     print(message)
-    log_to_file(message)
+    log_to_gcs(message)
 
 @app.get("/")
 def health_check():
