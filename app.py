@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 LOG_DIR = "/app/logs"
 os.makedirs(LOG_DIR, exist_ok=True)
-START_TIME = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+START_TIME = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
 LOG_FILENAME = os.path.join(LOG_DIR, f"log_{START_TIME}.txt")
 
 storage_client = storage.Client()
