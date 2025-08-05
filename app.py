@@ -11,8 +11,9 @@ from google.cloud import storage
 app = Flask(__name__)
 
 LOG_DIR = "/app/logs"
-LOG_FILE_PATH = os.path.join(LOG_DIR, "app.log")
 os.makedirs(LOG_DIR, exist_ok=True)
+START_TIME = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+LOG_FILENAME = os.path.join(LOG_DIR, f"log_{START_TIME}.txt")
 
 storage_client = storage.Client()
 BUCKET_NAME= os.environ.get('BUCKET_NAME')
@@ -22,32 +23,31 @@ if not BUCKET_NAME:
 bucket = storage_client.bucket(BUCKET_NAME)
 
 
-def log_to_gcs(message):
-    # Append to local log file
+def log_to_gcs():
+    """Upload the current log file to GCS with a timestamped name."""
     try:
-        with open(LOG_FILE_PATH, 'a') as f:
-            f.write(message + "\n")
-    except Exception as e:
-        print("Error writing to local log file:", e)
-
-    # Upload entire log to GCS
-    try:
-        if os.path.exists(LOG_FILE_PATH):
-            with open(LOG_FILE_PATH, 'r') as f:
+        if os.path.exists(LOG_FILENAME):
+            with open(LOG_FILENAME, 'r') as f:
                 content = f.read()
-            blob = bucket.blob('app.log')  # static filename
+            # Use the timestamped filename for upload
+            gcs_filename = f"{START_TIME}.txt"
+            blob = bucket.blob(gcs_filename)
             blob.upload_from_string(content)
-            print("Logs uploaded to GCS")
+            print(f"Uploaded {gcs_filename} to GCS.")
         else:
-            print("Log file not found for upload.")
+            print("Log file doesn't exist yet.")
     except Exception as e:
-        print("Error uploading logs to GCS:", e)
-
+        print("Error uploading log to GCS:", e)
 
 def log(message):
-    """Print and save logs."""
+    """Prints message and writes to the timestamped log file."""
     print(message)
-    log_to_gcs(message)
+    try:
+        with open(LOG_FILENAME, 'a') as f:
+            f.write(message + "\n")
+    except Exception as e:
+        print("Error writing to log file:", e)
+
 
 @app.get("/")
 def health_check():
@@ -73,7 +73,7 @@ def github_webhook():
     log(f"Webhook triggered for event: {event_type}")
 
     # Start async processing to avoid timeout
-    thread = Thread(target=handle_event_async, args=(payload, event_type))
+    thread = threading.Thread(target=handle_event_async, args=(payload, event_type))
     thread.start()
 
     log("Started background processing for event.")
@@ -233,6 +233,7 @@ def handle_event(payload, event_type):
         log("Pull request event detected.")
     else:
         log(f"Unhandled event: {event_type}")
+    log_to_gcs()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8080'))
