@@ -234,7 +234,7 @@ def run_tests_for_test_file(test_filename):
     except Exception as e:
         log(f"Error while running tests for {test_filename}: {e}")
 
-        
+
 def handle_event(payload, event_type):
     if event_type == 'push':
         # Check for tag event
@@ -259,6 +259,14 @@ def handle_event(payload, event_type):
                     if source_content is None:
                         log(f"Could not fetch source for {f}")
                         continue
+
+                    local_module_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.basename(f))
+                    try:
+                        with open(local_module_path, 'w', encoding='utf-8') as lm:
+                            lm.write(source_content)
+                        log(f"Copied source to local module for testing: {local_module_path}")
+                    except Exception as e:
+                        log(f"Error writing local module for testing: {e}")
 
                     # Generate test code
                     test_code = generate_tests_for_code(source_content)
