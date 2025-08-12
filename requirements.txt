@@ -2,3 +2,4 @@ Flask
 requests
 google-generativeai
 google-cloud-storage
+pytest

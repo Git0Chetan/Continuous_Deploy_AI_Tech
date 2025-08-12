@@ -5,6 +5,7 @@ import tempfile
 import base64
 import logging
 import threading
+import subprocess
 from datetime import datetime
 from google.cloud import storage
 
@@ -183,6 +184,57 @@ def generate_tests_for_code(source_code_str):
     log("Generated test code for source.")
     return test_code
 
+def upload_report_to_gcs(report_path, blob_name=None):
+    """Upload a local test report (JUnit XML) to GCS."""
+    if not os.path.exists(report_path):
+        log(f"Report path not found: {report_path}")
+        return
+    if not BUCKET_NAME:
+        log("BUCKET_NAME environment variable is not set")
+        return
+    if not blob_name:
+        blob_name = f"reports/{START_TIME}-{os.path.basename(report_path)}"
+    try:
+        bucket_local = storage_client.bucket(BUCKET_NAME)
+        blob = bucket_local.blob(blob_name)
+        with open(report_path, 'rb') as f:
+            blob.upload_from_file(f)
+        log(f"Uploaded test report to GCS: {blob_name}")
+    except Exception as e:
+        log(f"Error uploading report to GCS: {e}")
+
+def run_tests_for_test_file(test_filename):
+    """Run pytest for a single test file and upload its JUnit XML report to GCS."""
+    test_filepath = os.path.join("tests", test_filename)
+    if not os.path.exists(test_filepath):
+        log(f"Test file not found: {test_filepath}")
+        return
+
+    # Ensure reports dir exists
+    os.makedirs("reports", exist_ok=True)
+
+    # Output report path (JUnit XML)
+    report_filename = f"{os.path.splitext(test_filename)[0]}_report.xml"
+    report_path = os.path.join("reports", report_filename)
+
+    # Run pytest for this test file and generate JUnit XML
+    cmd = ["pytest", "-q", f"{test_filepath}", f"--junitxml={report_path}"]
+    log(f"Running tests: {' '.join(cmd)}")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.stdout:
+            log(result.stdout)
+        if result.stderr:
+            log(result.stderr)
+        log(f"pytest finished with exit code: {result.returncode}")
+
+        # Upload report to GCS
+        blob_name = f"reports/{START_TIME}-{report_filename}"
+        upload_report_to_gcs(report_path, blob_name=blob_name)
+    except Exception as e:
+        log(f"Error while running tests for {test_filename}: {e}")
+
+        
 def handle_event(payload, event_type):
     if event_type == 'push':
         # Check for tag event
@@ -227,6 +279,9 @@ def handle_event(payload, event_type):
                         tf.write(test_code)
                     # Upload test file to GitHub repo
                     create_or_update_github_file(owner_repo, test_filepath, open(test_filepath, 'r').read())
+                    # Run tests for this test file and upload the report
+                    test_filename_only = test_filename  # e.g., file_test.py
+                    run_tests_for_test_file(test_filename_only)
         else:
             log("No changed Python files detected.")
     elif event_type == 'pull_request':
