@@ -166,20 +166,18 @@ def generate_tests_for_code(source_code_str):
         return ""
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
+
     prompt = (
         "You are a Python test automation engineer. "
         "Analyze the following Python code and generate comprehensive Pytest test functions for it. "
-        "Create test cases that cover edge cases, valid inputs, invalid inputs, and error conditions. "
-        "Use the pytest framework and include meaningful assertions. "
-        "Test each public function and class method exposed by the module: write separate tests for each function and for each class you detect, including initialization. "
-        "Your output must be pure pytest code only (no explanations, comments, or file headers). "
-        "Do not include any file or directory structure information. The system will place the generated code into the correct tests/<module>_test.py file and import the module as needed. "
-        "If the code uses input() or prints during import, do not rely on them; wrap interactive logic in a function and test that function, or use monkeypatch to provide inputs. "
-        "Prefer deterministic tests: mock or patch randomness, time, network, filesystem, and environment data as required. "
-        "Use parameterization to cover multiple inputs where appropriate. "
-        "Return only the test code; do not explain. "
-        "Source code:\n{source_code_str}\n"
+        "Create test cases that cover different scenarios including edge cases, valid inputs, invalid inputs, and error conditions. "
+        "Use the pytest framework and include appropriate assertions. "
+        "If the code contains functions, test each function separately. "
+        "If the code contains classes, test the class methods and initialization. "
+        "Only return the test code, do not explain.\n\n"
+        f"Source code to test:\n{source_code_str}\n"
     )
+
     response = model.generate_content(prompt)
     test_code = response.text.strip()
 
@@ -294,7 +292,7 @@ def handle_event(payload, event_type):
                         # tf.write(f"from {os.path.splitext(os.path.basename(f))[0]} import *\n\n")
                         tf.write(f"from {module_name} import *\n\n")
                         test_code_lines = test_code.splitlines()
-                        test_code_no_header = "\n".join(test_code_lines[2:])
+                        test_code_no_header = "\n".join(test_code_lines[3:])
                         tf.write(test_code_no_header)
                     # Upload test file to GitHub repo
                     create_or_update_github_file(owner_repo, test_filepath, open(test_filepath, 'r').read())
