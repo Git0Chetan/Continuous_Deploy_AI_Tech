@@ -168,10 +168,18 @@ def generate_tests_for_code(source_code_str):
     model = genai.GenerativeModel("gemini-1.5-flash")
     prompt = (
         "You are a Python test automation engineer. "
-        "Analyze the following Python code and generate comprehensive pytest test functions for it. "
-        "Create test cases covering different scenarios, edge cases, valid and invalid inputs, and error conditions. "
-        "Use the pytest framework, include appropriate assertions, and test functions and classes as applicable.\n\n"
-        f"Source code:\n{source_code_str}\n"
+        "Analyze the following Python code and generate comprehensive Pytest test functions for it. "
+        "Create test cases that cover different scenarios including edge cases, valid inputs, invalid inputs, and error conditions. "
+        "Use the pytest framework and include appropriate assertions. "
+        "If the code contains functions, test each function separately. "
+        "If the code contains classes, test the class methods and initialization. "
+        "Test importability: avoid top-level execution on import; prefer importing by name and calling functions in tests. "
+        "If the code uses input() or prints at import time, wrap interactive logic under a name == 'main' guard or expose a function to call in tests; show how to test interactive IO using monkeypatch or fixtures. "
+        "Aim for deterministic tests: mock or patch any randomness, time, network, filesystem, or environment dependencies. "
+        "Use parameterized tests where appropriate to cover multiple inputs. "
+        "Structure tests with clear, named test functions and, if applicable, a small set of class-based tests for initialization and methods. "
+        "Return only the test code, do not explain. "
+        "Source code:\n{source_code_str}\n"
     )
     response = model.generate_content(prompt)
     test_code = response.text.strip()
@@ -283,7 +291,8 @@ def handle_event(payload, event_type):
                         tf.write("import pytest\n")
                         tf.write(f"import sys\nimport os\n")
                         tf.write(f"sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\n")
-                        tf.write(f"from {os.path.splitext(os.path.basename(f))[0]} import *\n\n")
+                        # tf.write(f"from {os.path.splitext(os.path.basename(f))[0]} import *\n\n")
+                        tf.write(f"from {module_name} import *\n\n")
                         tf.write(test_code)
                     # Upload test file to GitHub repo
                     create_or_update_github_file(owner_repo, test_filepath, open(test_filepath, 'r').read())
