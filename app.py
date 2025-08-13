@@ -294,7 +294,7 @@ def handle_event(payload, event_type):
                         # tf.write(f"from {os.path.splitext(os.path.basename(f))[0]} import *\n\n")
                         tf.write(f"from {module_name} import *\n\n")
                         test_code_lines = test_code.splitlines()
-                        test_code_no_header = "\n".join(test_code_lines[3:])
+                        test_code_no_header = "\n".join(test_code_lines[2:])
                         tf.write(test_code_no_header)
                     # Upload test file to GitHub repo
                     create_or_update_github_file(owner_repo, test_filepath, open(test_filepath, 'r').read())
