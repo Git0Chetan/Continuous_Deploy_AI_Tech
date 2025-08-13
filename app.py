@@ -283,7 +283,8 @@ def handle_event(payload, event_type):
                         continue
 
                     # Save test code to local file temporarily
-                    test_filename = f"{os.path.splitext(os.path.basename(f))[0]}_test.py"
+                    module_name = os.path.splitext(os.path.basename(f))[0]
+                    test_filename = f"{module_name}_test.py"
                     test_dir = "tests"
                     os.makedirs(test_dir, exist_ok=True)
                     test_filepath = os.path.join(test_dir, test_filename)
